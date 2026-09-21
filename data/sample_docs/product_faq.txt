@@ -1,0 +1,30 @@
+Product FAQ: CloudSync Pro
+
+What is the data retention policy?
+CloudSync Pro retains deleted files in the Trash for 30 days before permanent deletion.
+Files deleted from Trash manually are removed immediately and cannot be recovered.
+Enterprise plan customers get an extended retention window of 90 days.
+
+What are the storage limits?
+The Free plan includes 5 GB of storage. The Pro plan includes 200 GB. The Enterprise plan
+includes unlimited storage but is subject to a fair-use cap of 5 TB per user per month, beyond
+which additional charges apply at 2 USD per 100 GB.
+
+How does file versioning work?
+CloudSync Pro keeps the last 25 versions of any file for Free and Pro plans. Enterprise plans
+keep unlimited version history. Version history older than 180 days is automatically pruned
+for Free plan users only.
+
+What is the maximum file upload size?
+Individual file uploads are capped at 5 GB for Free and Pro plans, and 50 GB for Enterprise
+plans. Files larger than this must be uploaded using the CloudSync CLI tool with chunked upload
+enabled.
+
+Is two-factor authentication supported?
+Yes. Two-factor authentication (2FA) via authenticator app is available on all plans. SMS-based
+2FA is only available on Pro and Enterprise plans due to per-message carrier costs.
+
+What happens if I downgrade my plan?
+If your used storage exceeds the limit of your new (lower) plan, your account is placed in
+read-only mode until you either delete files to fit within the new limit or upgrade again.
+You will not lose any data during this read-only period, but you cannot upload new files.
