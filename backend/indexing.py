@@ -9,17 +9,17 @@ import os
 import glob
 import numpy as np
 from dataclasses import dataclass
-from sentence_transformers import SentenceTransformer
+from google import genai
+from google.genai.errors import APIError
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 
-_MODEL_NAME = "all-MiniLM-L6-v2"
-_model = None
+_client = None
 
-
-def get_embedder():
-    global _model
-    if _model is None:
-        _model = SentenceTransformer(_MODEL_NAME)
-    return _model
+def get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client()
+    return _client
 
 
 @dataclass
@@ -54,7 +54,6 @@ def chunk_text(text: str, source: str, chunk_size: int = 400, overlap: int = 80)
 
 def build_index(doc_dir: str) -> list[Chunk]:
     """Load all .txt files in doc_dir, chunk them, and embed every chunk."""
-    embedder = get_embedder()
     all_chunks: list[Chunk] = []
 
     for path in sorted(glob.glob(os.path.join(doc_dir, "*.txt"))):
@@ -67,16 +66,27 @@ def build_index(doc_dir: str) -> list[Chunk]:
         return []
 
     texts = [c.text for c in all_chunks]
-    embeddings = embedder.encode(texts, normalize_embeddings=True, show_progress_bar=False)
-    for chunk, emb in zip(all_chunks, embeddings):
+    arr = embed_texts(texts)
+    for chunk, emb in zip(all_chunks, arr):
         chunk.embedding = emb
 
     return all_chunks
 
-
+@retry(
+    retry=retry_if_exception_type(APIError),
+    wait=wait_exponential(multiplier=2, min=5, max=60),
+    stop=stop_after_attempt(8)
+)
 def embed_texts(texts: list[str]) -> np.ndarray:
-    embedder = get_embedder()
-    return embedder.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+    client = get_client()
+    result = client.models.embed_content(
+        model='text-embedding-004',
+        contents=texts
+    )
+    embeddings = [emb.values for emb in result.embeddings]
+    arr = np.array(embeddings)
+    norms = np.linalg.norm(arr, axis=1, keepdims=True)
+    return arr / norms
 
 
 def retrieve(query: str, chunks: list[Chunk], top_k: int = 4) -> list[tuple[Chunk, float]]:
