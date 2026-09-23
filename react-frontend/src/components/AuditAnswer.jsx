@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "https://rag-verifier.onrender.com";
 
 export default function AuditAnswer({ onResult }) {
   const [query, setQuery] = useState('');
