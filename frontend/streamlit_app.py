@@ -9,14 +9,25 @@ Two modes:
      Demonstrates the verifier works independently of what generated the answer.
 
 Run with: streamlit run frontend/streamlit_app.py
-(Make sure the FastAPI backend is running first: uvicorn backend.app:app --port 8000)
 """
 import streamlit as st
-import requests
+import time
+import os
+import sys
 
-API_BASE = "http://localhost:8000"
+# Add the parent directory to the path so we can import the backend logic
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from backend.indexing import build_index, retrieve, Chunk
+from backend import llm
+from backend.verifier import verify_answer, VerificationReport
 
 st.set_page_config(page_title="RAG Answer Verifier", page_icon="✅", layout="wide")
+
+@st.cache_resource(show_spinner="Loading document index...")
+def get_index():
+    doc_dir = os.environ.get("DOC_DIR", os.path.join(os.path.dirname(__file__), "..", "data", "sample_docs"))
+    return build_index(doc_dir)
 
 BADGE_STYLE = {
     "green": ("🟢", "#1a7f37", "High confidence — claims are well-supported by sources."),
@@ -30,6 +41,16 @@ VERDICT_COLOR = {
     "unverifiable": "#9a6700",
 }
 
+def _report_to_dict(report: VerificationReport, latency: float) -> dict:
+    return {
+        "query": report.query,
+        "answer": report.answer,
+        "claims": [vars(c) for c in report.claims],
+        "faithfulness_score": report.faithfulness_score,
+        "badge": report.badge,
+        "retrieved_sources": report.retrieved_sources,
+        "latency_seconds": round(latency, 2),
+    }
 
 def render_report(report: dict):
     st.toast("Verification complete!", icon="✅")
@@ -123,13 +144,22 @@ with tab1:
     if st.button("Generate & Verify", type="primary", disabled=not query):
         with st.spinner("Retrieving context, generating answer, verifying claims..."):
             try:
-                resp = requests.post(f"{API_BASE}/query", json={"query": query}, timeout=120)
-                resp.raise_for_status()
-                render_report(resp.json())
-            except requests.exceptions.ConnectionError:
-                st.error("Can't reach the backend. Start it with:\n\n`uvicorn backend.app:app --reload --port 8000`")
-            except requests.exceptions.HTTPError as e:
-                st.error(f"Backend error: {e.response.text}")
+                start_time = time.time()
+                chunks = get_index()
+                if not chunks:
+                    st.error("No documents indexed. Check DOC_DIR.")
+                else:
+                    retrieved = retrieve(query, chunks, top_k=4)
+                    retrieved_chunks = [c for c, _score in retrieved]
+                    context_texts = [c.text for c in retrieved_chunks]
+                    
+                    answer = llm.generate_answer(query, context_texts)
+                    report = verify_answer(query, answer, retrieved_chunks)
+                    
+                    report_dict = _report_to_dict(report, time.time() - start_time)
+                    render_report(report_dict)
+            except Exception as e:
+                st.error(f"Backend error: {str(e)}")
 
 with tab2:
     st.markdown("#### Audit any answer against the corpus")
@@ -152,15 +182,20 @@ with tab2:
     if st.button("Verify this answer", type="primary", disabled=not (query_audit and answer_audit)):
         with st.spinner("Verifying claims against corpus..."):
             try:
-                resp = requests.post(
-                    f"{API_BASE}/verify", json={"query": query_audit, "answer": answer_audit}, timeout=120
-                )
-                resp.raise_for_status()
-                render_report(resp.json())
-            except requests.exceptions.ConnectionError:
-                st.error("Can't reach the backend. Start it with:\n\n`uvicorn backend.app:app --reload --port 8000`")
-            except requests.exceptions.HTTPError as e:
-                st.error(f"Backend error: {e.response.text}")
+                start_time = time.time()
+                chunks = get_index()
+                if not chunks:
+                    st.error("No documents indexed. Check DOC_DIR.")
+                else:
+                    retrieved = retrieve(query_audit, chunks, top_k=4)
+                    retrieved_chunks = [c for c, _score in retrieved]
+                    
+                    report = verify_answer(query_audit, answer_audit, retrieved_chunks)
+                    
+                    report_dict = _report_to_dict(report, time.time() - start_time)
+                    render_report(report_dict)
+            except Exception as e:
+                st.error(f"Backend error: {str(e)}")
 
 with st.sidebar:
     st.markdown("### How it works")
