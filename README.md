@@ -35,7 +35,7 @@ Query
 [Aggregation] ── weighted score → faithfulness % → badge (green/yellow/red)
   │
   ▼
-UI (Streamlit): answer with claim-by-claim breakdown + evidence + badge
+UI (React): answer with claim-by-claim breakdown + evidence + badge
 ```
 
 ## Project structure
@@ -47,8 +47,8 @@ rag-verifier/
 │   ├── indexing.py      Chunking + embedding + retrieval
 │   ├── llm.py            Gemini wrapper: generation, claim decomposition, judge
 │   └── verifier.py       Core verification engine (the hybrid pipeline)
-├── frontend/
-│   └── streamlit_app.py  UI: ask a question, or audit any existing answer
+├── react-frontend/       React UI powered by Vite
+├── frontend/             (Legacy Streamlit UI fallback)
 ├── data/sample_docs/     Sample corpus (company policy + product FAQ)
 ├── requirements.txt
 └── .env.example
@@ -57,23 +57,22 @@ rag-verifier/
 ## Setup
 
 1. Get a Gemini API key: https://aistudio.google.com/apikey
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Set your API key:
+2. Set your API key:
    ```bash
    export GEMINI_API_KEY=your-key-here
    ```
-4. Start the backend:
+3. Start the backend:
    ```bash
+   pip install -r requirements.txt
    uvicorn backend.app:app --reload --port 8000
    ```
-5. In a second terminal, start the UI:
+4. In a second terminal, start the React UI:
    ```bash
-   streamlit run frontend/streamlit_app.py
+   cd react-frontend
+   npm install
+   npm run dev
    ```
-6. Open the Streamlit URL it prints (usually http://localhost:8501)
+5. Open the Local URL it prints (usually http://localhost:5173)
 
 ## Try it
 
